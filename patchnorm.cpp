@@ -22,13 +22,15 @@ int main(int argc, char** argv) {
     
     cout << "Running patch norm on CPU" << endl;
     auto t1 = std::chrono::steady_clock::now();
-	patchnorm(img, pn, 17);
-	normalize(pn, pn, 255, 0, NORM_MINMAX);
-    pn.convertTo(pn, CV_8UC1);
+	/* patchnorm(img, pn, 17); */
+	/* normalize(pn, pn, 255, 0, NORM_MINMAX); */
+    /* pn.convertTo(pn, CV_8UC1); */
     
+    PatchNormCuda normalizer(img.size().width, img.size().height);
     auto t2 = std::chrono::steady_clock::now();
     cout << "Running patch norm on GPU" << endl;
-    patchnorm_cuda(img, pn2, 17);
+    
+    normalizer.compute(img, pn2, 17);
     normalize(pn2, pn2, 255, 0, NORM_MINMAX);
     pn2.convertTo(pn2, CV_8UC1);
     /* cout << pn2 << endl; */

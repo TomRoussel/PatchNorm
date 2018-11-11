@@ -11,6 +11,8 @@ using std::endl;
 // mean= (I(br) - I(tl)) / N
 // var = ((I2(br) - I2(tl)) - mean^2*N) / (N-1)
 
+////// CUDA kernels //////
+
 __global__
 void CU_patchnorm(uchar *pixel, float *out, int h, int w, int neighb, size_t pitch_in, size_t pitch_out) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -46,6 +48,7 @@ void CU_patchnorm(uchar *pixel, float *out, int h, int w, int neighb, size_t pit
             }
         }
         var /= neighb * neighb;
+        // Add small value to denominator (to prevent huge values around zero)
         float stdev = sqrt(var) + 1e-3;
         
         // Patchnorm the current pixel
@@ -57,40 +60,37 @@ void CU_patchnorm(uchar *pixel, float *out, int h, int w, int neighb, size_t pit
     }
 }
 
-void patchnorm_cuda(cv::Mat& in, cv::Mat& out, int neighb) {
-    uchar* in_ptr;
-    float* out_ptr;
-    size_t pitch_in, pitch_out;
-    cudaMallocPitch(&in_ptr, &pitch_in, in.size().width, in.size().height);
-    cudaMallocPitch(&out_ptr, &pitch_out, in.size().width * sizeof(float), in.size().height);    
+////// C++ code //////
 
+PatchNormCuda::PatchNormCuda(int width, int height): width(width), height(height) {
+    // Initialize CUDA memory
+    cudaMallocPitch(&in_ptr, &pitch_in, width, height);
+    cudaMallocPitch(&out_ptr, &pitch_out, width * sizeof(float), height);    
+
+    blockSize = 512;
+    numBlocks = (width * height + blockSize - 1) / blockSize;
+}
+
+PatchNormCuda::~PatchNormCuda() {
+    cudaFree(in_ptr);
+    cudaFree(out_ptr);
+}
+
+void PatchNormCuda::compute(cv::Mat& in, cv::Mat& out, int neighb) {
     if(!in.isContinuous()) {
         cout << "NOT CONTINUOUS" << endl;
         cout << "IS BAD" << endl;
         exit(1);
     }
 
-    cudaMemcpy2D(in_ptr, pitch_in, in.ptr(), in.size().width, in.size().width, in.size().height, cudaMemcpyHostToDevice);
+    cudaMemcpy2D(in_ptr, pitch_in, in.ptr(), width, width, height, cudaMemcpyHostToDevice);
     
-    int blockSize = 512;
-    int numBlocks = (in.size().width * in.size().height + blockSize - 1) / blockSize;
-    CU_patchnorm<<<numBlocks,blockSize>>>(in_ptr, out_ptr, in.size().height, in.size().width, neighb, pitch_in, pitch_out);
+    CU_patchnorm<<<numBlocks,blockSize>>>(in_ptr, out_ptr, height, width, neighb, pitch_in, pitch_out);
 
-    float* out_ptr_host = new float[in.size().width * in.size().height]();
-    cudaMemcpy2D(out_ptr_host, in.size().width*sizeof(float), out_ptr, pitch_out, in.size().width * sizeof(float), in.size().height, cudaMemcpyDeviceToHost);
+    float* out_ptr_host = new float[width * height]();
+    cudaMemcpy2D(out_ptr_host, width*sizeof(float), out_ptr, pitch_out, width * sizeof(float), height, cudaMemcpyDeviceToHost);
 
-    out = cv::Mat(in.size().height, in.size().width, CV_32FC1, out_ptr_host);
-
-    cudaFree(in_ptr);
-    cudaFree(out_ptr);
-
-    free(out_ptr_host);
-
-    /* for(int x=0; x<out.cols; x++) { */
-    /*     for(int y=0; y<out.rows; y++) { */
-    /*         printf("x: %d, y: %d, value: ", x, y); */
-    /*         cout << out.at<float>(y,x) << endl; */
-    /*     } */
-    /* } */
-
+    out = cv::Mat(height, width, CV_32FC1, out_ptr_host);
+    // don't free out_ptr_host, data is managed by the new Mat
+    /* free(out_ptr_host); */
 }
