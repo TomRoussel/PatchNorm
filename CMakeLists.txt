@@ -14,5 +14,7 @@ CUDA_ADD_LIBRARY(patchnorm SHARED
 
 target_link_libraries(patchnorm ${OpenCV_LIBS})
 
+add_executable(patchnorm_convert convert.cpp)
+target_link_libraries(patchnorm_convert ${OpenCV_LIBS} patchnorm)
 add_executable(patchnorm_test patchnorm.cpp)
 target_link_libraries(patchnorm_test ${OpenCV_LIBS} patchnorm)
