@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(patchnorm LANGUAGES CXX)
 
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 14)
 
 find_package(CUDA REQUIRED)
 find_package(OpenCV REQUIRED core highgui imgcodecs)
@@ -15,6 +15,6 @@ CUDA_ADD_LIBRARY(patchnorm SHARED
 target_link_libraries(patchnorm ${OpenCV_LIBS})
 
 add_executable(patchnorm_convert convert.cpp)
-target_link_libraries(patchnorm_convert ${OpenCV_LIBS} patchnorm)
+target_link_libraries(patchnorm_convert ${OpenCV_LIBS} patchnorm stdc++fs)
 add_executable(patchnorm_test patchnorm.cpp)
-target_link_libraries(patchnorm_test ${OpenCV_LIBS} patchnorm)
+target_link_libraries(patchnorm_test ${OpenCV_LIBS} patchnorm )
